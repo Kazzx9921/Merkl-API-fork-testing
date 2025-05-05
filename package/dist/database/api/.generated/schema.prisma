@@ -1,0 +1,477 @@
+generator client {
+  provider        = "prisma-client-js"
+  binaryTargets   = ["native", "linux-arm64-openssl-3.0.x", "linux-arm64-openssl-1.1.x", "linux-musl-arm64-openssl-3.0.x"]
+  output          = ".generated/"
+  previewFeatures = ["fullTextSearchPostgres", "relationJoins"]
+}
+
+generator drizzle {
+  provider = "drizzle-prisma-generator"
+  output   = ".generated/drizzle/" // Where to put generated Drizle tables
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_API_URL")
+}
+
+model Campaign {
+  id                    String                  @id
+  ComputeChain          Chain                   @relation("compute", fields: [computeChainId], references: [id])
+  computeChainId        Int
+  DistributionChain     Chain                   @relation("distribution", fields: [distributionChainId], references: [id])
+  distributionChainId   Int
+  campaignId            String
+  type                  String
+  distributionType      DistributionType        @default(DUTCH_AUCTION)
+  subType               Int?
+  RewardToken           Token                   @relation(fields: [rewardTokenId], references: [id])
+  rewardTokenId         String
+  amount                String
+  Opportunity           Opportunity             @relation(fields: [opportunityId], references: [id])
+  opportunityId         String
+  startTimestamp        BigInt
+  endTimestamp          BigInt
+  params                Json
+  description           String? // Can only be added manually for now
+  RewardBreakdown       RewardBreakdown[]       @relation("Campaign")
+  DailyRewardsBreakdown DailyRewardsBreakdown[]
+  Creator               User                    @relation(fields: [creatorAddress], references: [address])
+  creatorAddress        String                  @db.Char(42)
+  // Should probably be a 1 to 1 relation if we do not want to keep historic records
+  CampaignStatus        CampaignStatus[]
+  CampaignEngineValues  CampaignComputedValue[]
+  UserComputedValue     UserComputedValue[]
+
+  // Fields should be automatically parsable and overriden periodically UNLESS
+  // they are manually overridden, in which case they should be kept as is
+  manualOverrides CampaignManualOverride[] @default([])
+
+  createdAt DateTime @default(now())
+
+  rootCampaignId             String? // In case this is a subCampaign, refers to the root of the subCampaign tree
+  rootCampaign               Campaign?         @relation("root", fields: [rootCampaignId], references: [id])
+  subCampaigns               Campaign[]        @relation("root")
+  parentCampaignId           String? // In case this is a subCampaign, refers to the parent campaign in the subCampaign tree
+  parentCampaign             Campaign?         @relation("parent", fields: [parentCampaignId], references: [id])
+  childCampaigns             Campaign[]        @relation("parent")
+  RewardBreakdownSubCampaign RewardBreakdown[] @relation("SubCampaign")
+
+  @@unique([distributionChainId, campaignId])
+  @@index([opportunityId], type: Hash)
+}
+
+// SubTable of Campaigns that should be here as soon as the campaign is processed
+model CampaignStatus {
+  campaignId        String    @id
+  Campaign          Campaign  @relation(fields: [campaignId], references: [id])
+  computedUntil     BigInt
+  processingStarted BigInt
+  status            RunStatus @default(SUCCESS)
+  error             String    @default("")
+  details           Json      @default("{}")
+}
+
+// SubTable of Campaigns that will contain values populated by the Engine when it's running
+model CampaignComputedValue {
+  campaignId            String   @id
+  Campaign              Campaign @relation(fields: [campaignId], references: [id])
+  averageBoost          Float? // Average boost in case of boosting hook
+  totalDistributedInUSD Float? // Used in case there is a distribution cap
+  forfeitingBoost       Float? // In case some rewards are forfeited, resulting boost for remaining users
+}
+
+model UserComputedValue {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  campaignId String
+  Campaign   Campaign @relation(fields: [campaignId], references: [id])
+  address    String   @db.Char(42)
+  User       User?    @relation(fields: [address], references: [address])
+  reason     String
+  boost      Float?
+
+  @@unique([campaignId, address, reason])
+}
+
+model Chain {
+  id           Int           @id
+  name         String
+  icon         String
+  // liveCampaigns Int           @default(0)
+  // dailyRewards  Float         @default(0)
+  Explorer     Explorer[]
+  Campaigns    Campaign[]    @relation("compute")
+  Distribution Campaign[]    @relation("distribution")
+  Token        Token[]
+  Opportunity  Opportunity[]
+  MerklRoot    MerklRoot[]
+  Blacklist    Blacklist[]
+  Dump         Dump[]
+}
+
+model Explorer {
+  id      String       @id
+  type    ExplorerType
+  Chain   Chain        @relation(fields: [chainId], references: [id])
+  url     String
+  chainId Int
+
+  @@unique([type, chainId])
+}
+
+model Opportunity {
+  id                    String                      @id
+  Chain                 Chain                       @relation(fields: [chainId], references: [id]) // compute
+  chainId               Int // compute
+  type                  String
+  identifier            String // eg. 0xUniswapPool - formerly mainParameter
+  name                  String // Override
+  description           String                      @default("") // Override  
+  howToSteps            String[]                    @default([]) // Override
+  depositUrl            String? // Override
+  explorerAddress       String? // Override
+  status                Status
+  action                OpportunityAction // Override
+  Tokens                Token[]
+  Campaigns             Campaign[]
+  Protocols             Protocol[]
+  MainProtocol          Protocol?                   @relation(name: "main", fields: [mainProtocolId], references: [id])
+  mainProtocolId        String?
+  tvl                   Float                       @default(0)
+  TvlRecords            TVLRecord[]
+  apr                   Float                       @default(0)
+  AprRecords            AprRecord[]
+  dailyRewards          Float                       @default(0)
+  DailyRewardsRecords   DailyRewardsRecord[]
+  tags                  String[]                    @default([])
+  lastCampaignCreatedAt DateTime                    @default(now())
+  manualOverrides       OpportunityManualOverride[] @default([])
+
+  // Fields should be automatically parsable and overriden periodically UNLESS
+  // they are manually overridden, in which case they should be kept as is
+  // manualOverrides OpportunityManualOverride[] @default([])
+
+  @@unique([chainId, type, identifier])
+}
+
+model Protocol {
+  id                String            @id
+  tags              String[]          @default([])
+  name              String
+  description       String            @default("")
+  url               String
+  icon              String
+  // liveCampaigns     Int               @default(0)
+  // totalDailyRewards Float             @default(0)
+  MainOpportunities Opportunity[]     @relation(name: "main")
+  Opportunities     Opportunity[]
+  RewardBreakdown   RewardBreakdown[]
+}
+
+model Token {
+  id            String        @id()
+  name          String?
+  Chain         Chain         @relation(fields: [chainId], references: [id])
+  chainId       Int
+  address       String        @db.Char(42)
+  decimals      Int
+  symbol        String
+  displaySymbol String        @default("")
+  icon          String
+  verified      Boolean       @default(false)
+  isTest        Boolean       @default(false)
+  isPoint       Boolean       @default(false)
+  isPreTGE      Boolean       @default(false) // Pre-TGE tokens, used to display a warning in the UI
+  isNative      Boolean       @default(false)
+  price         Float?
+  Opportunity   Opportunity[]
+  Campaigns     Campaign[]
+  Reward        Reward[]
+  DumpTo        Dump[]        @relation("to")
+  DumpFrom      Dump[]        @relation("from")
+
+  @@unique([chainId, address])
+  @@index([chainId], type: Hash)
+  @@index([symbol, address])
+}
+
+model AprRecord {
+  id            String         @id
+  timestamp     BigInt
+  cumulated     Float
+  AprBreakdown  AprBreakdown[]
+  Opportunity   Opportunity    @relation(fields: [opportunityId], references: [id])
+  opportunityId String
+
+  @@unique([opportunityId, timestamp])
+  @@index([opportunityId, timestamp(sort: Desc)])
+}
+
+model AprBreakdown {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  identifier  String
+  type        AprType
+  value       Float
+  AprRecord   AprRecord @relation(fields: [aprRecordId], references: [id], onDelete: Cascade)
+  aprRecordId String
+
+  @@index([aprRecordId], type: Hash)
+}
+
+model TVLRecord {
+  id           String         @id
+  timestamp    BigInt
+  total        Float
+  TvlBreakdown TVLBreakdown[]
+
+  Opportunity   Opportunity @relation(fields: [opportunityId], references: [id])
+  opportunityId String
+
+  @@unique([opportunityId, timestamp])
+  @@index([opportunityId, timestamp(sort: Desc)])
+}
+
+model TVLBreakdown {
+  id         String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  identifier String
+  type       TvlType
+  value      Float // In case type is TOKEN, this is the raw amount of tokens
+
+  TvlRecord   TVLRecord @relation(fields: [tvlRecordId], references: [id], onDelete: Cascade)
+  tvlRecordId String
+
+  @@index([tvlRecordId], type: Hash)
+}
+
+model DailyRewardsRecord {
+  id                    String                  @id
+  timestamp             BigInt
+  total                 Float
+  DailyRewardsBreakdown DailyRewardsBreakdown[]
+
+  Opportunity   Opportunity @relation(fields: [opportunityId], references: [id])
+  opportunityId String
+
+  @@unique([opportunityId, timestamp])
+  @@index([opportunityId, timestamp(sort: Desc)])
+}
+
+model DailyRewardsBreakdown {
+  id                   String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  value                Float
+  campaignId           String
+  Campaign             Campaign           @relation(fields: [campaignId], references: [id])
+  DailyRewardsRecord   DailyRewardsRecord @relation(fields: [dailyRewardsRecordId], references: [id], onDelete: Cascade)
+  dailyRewardsRecordId String
+
+  @@index([dailyRewardsRecordId], type: Hash)
+}
+
+model User {
+  address           String              @id @db.Char(42)
+  Rewards           Reward[]
+  Blacklist         Blacklist[]
+  CampaignsCreated  Campaign[]
+  UserComputedValue UserComputedValue[]
+  tags              String[]
+
+  Creator   Creator? @relation(fields: [creatorId], references: [id])
+  creatorId String?
+}
+
+model Creator {
+  id        String  @id
+  icon      String?
+  name      String
+  rebateFee Int     @default(0)
+  Users     User[]
+}
+
+// How much reward token per user per chain
+model Reward {
+  id            String            @id
+  MerklRoot     MerklRoot         @relation(fields: [root], references: [root])
+  root          String
+  User          User              @relation(fields: [recipient], references: [address])
+  recipient     String            @db.Char(42)
+  RewardToken   Token             @relation(fields: [rewardTokenId], references: [id])
+  rewardTokenId String
+  amount        String            @default("0")
+  claimed       String            @default("0")
+  pending       String            @default("0")
+  proofs        String[]
+  Breakdown     RewardBreakdown[]
+  // Hidden index on ((CAST(amount AS INTEGER) + CAST(pending AS INTEGER)));
+
+  @@unique([root, recipient, rewardTokenId])
+  @@index([root], type: Hash)
+  @@index([recipient, rewardTokenId])
+}
+
+model RewardBreakdown {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  Protocol      Protocol? @relation(fields: [protocolId], references: [id])
+  protocolId    String?
+  reason        String
+  amount        String
+  claimed       String
+  pending       String
+  Reward        Reward    @relation(fields: [rewardId], references: [id], onDelete: Cascade)
+  rewardId      String
+  campaignId    String
+  Campaign      Campaign  @relation(name: "Campaign", fields: [campaignId], references: [id])
+  subCampaignId String?
+  SubCampaign   Campaign? @relation(name: "SubCampaign", fields: [subCampaignId], references: [id])
+
+  // Hidden index on ((CAST(amount AS INTEGER) + CAST(pending AS INTEGER)));
+  @@unique([rewardId, campaignId, reason])
+  @@index([rewardId], type: Hash)
+  @@index([campaignId], type: Hash)
+}
+
+model MerklRoot {
+  root      String   @id
+  Chain     Chain    @relation(fields: [chainId], references: [id])
+  chainId   Int
+  epoch     Int
+  timestamp BigInt
+  Rewards   Reward[]
+
+  @@index([chainId, root])
+}
+
+model PriceSource {
+  id     Int               @id @default(autoincrement()) // This should hold in Int ids
+  symbol String            @unique() // Price Id
+  method PriceSourceMethod
+  args   Json?
+}
+
+// priceId -> number
+
+model Blacklist {
+  id              String @id
+  Chain           Chain  @relation(fields: [chainId], references: [id])
+  chainId         Int
+  poolAddress     String @db.Char(42)
+  User            User   @relation(fields: [userAddress], references: [address])
+  userAddress     String @db.Char(42)
+  arrestTimestamp BigInt
+  arrestDetails   Json
+
+  @@unique([chainId, userAddress, poolAddress])
+  @@index([userAddress], type: Hash)
+}
+
+model Dump {
+  id          String   @id
+  Chain       Chain    @relation(fields: [chainId], references: [id])
+  chainId     Int
+  FromToken   Token    @relation(name: "from", fields: [fromTokenId], references: [id])
+  fromTokenId String
+  ToToken     Token    @relation(name: "to", fields: [toTokenId], references: [id])
+  toTokenId   String
+  multisig    String   @db.Char(42)
+  recipient   String   @db.Char(42)
+  amountIn    String   @default("0")
+  amountOut   String   @default("0")
+  datetime    DateTime
+  timestamp   Int
+
+  @@unique([chainId, fromTokenId, toTokenId, timestamp])
+}
+
+model Logged {
+  id                String           @id
+  chainId           Int
+  type              LoggedEntityType @default(UNKNOWN)
+  address           String?          @db.Char(42)
+  fetchAtBlock      Int
+  caughtFromAddress String           @db.Char(42)
+  entityData        Json
+
+  @@unique([chainId, address])
+}
+
+// enums
+
+enum LoggedEntityType {
+  UNKNOWN
+  EULER_VAULT
+  UNISWAP_V4
+  COMPOUND_v2
+}
+
+enum RunStatus {
+  PROCESSING
+  SUCCESS
+  FAILED
+  SKIPPED
+}
+
+enum OpportunityAction {
+  POOL
+  HOLD
+  DROP
+  LEND
+  BORROW
+  LONG
+  SHORT
+  SWAP
+  INVALID
+}
+
+enum Status {
+  NONE // This would mean that no campaigns was ever created for this opportunity
+  PAST
+  LIVE
+  SOON
+}
+
+enum ExplorerType {
+  ETHERSCAN
+  BLOCKSCOUT
+}
+
+enum AprType {
+  CAMPAIGN
+  TOKEN
+  PROTOCOL
+}
+
+enum TvlType {
+  TOKEN
+  PROTOCOL
+}
+
+enum PriceSourceMethod {
+  COINGECKO
+  CONSTANT
+  EQUAL_TO
+  ERC4626
+  DEXSCREENER
+  INDEXCOOP
+  DEFILLAMA
+}
+
+enum CampaignManualOverride {
+  opportunityId
+  creatorAddress
+}
+
+enum OpportunityManualOverride {
+  name
+  depositUrl
+  explorerAddress
+  action
+  description
+  howToSteps
+}
+
+enum DistributionType {
+  DUTCH_AUCTION
+  FIX_REWARD_VALUE_PER_LIQUIDITY_VALUE // The fix reward value will lie in params.apr
+  FIX_REWARD_AMOUNT_PER_LIQUIDITY_VALUE
+  FIX_REWARD_VALUE_PER_LIQUIDITY_AMOUNT
+  FIX_REWARD_AMOUNT_PER_LIQUIDITY_AMOUNT
+}

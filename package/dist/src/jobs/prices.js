@@ -1,0 +1,10 @@
+import { TokenService } from "@/modules/v4/token/token.service";
+import { log } from "@/utils/logger";
+import { Pricer } from "@/utils/pricer";
+const pricer = await Pricer.load();
+const prices = await pricer.update();
+log.info(`✅ ${Object.keys(prices).length} prices cache updated successfully`);
+log.info("⏳ Updating API database...");
+await TokenService.updatePrices(pricer);
+log.info("✅ API database updated successfully!");
+process.exit(0);

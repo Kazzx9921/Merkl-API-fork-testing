@@ -1,0 +1,248 @@
+generator client {
+  provider        = "prisma-client-js"
+  binaryTargets   = ["native", "linux-arm64-openssl-3.0.x", "linux-arm64-openssl-1.1.x", "linux-musl-arm64-openssl-3.0.x"]
+  output          = ".generated/"
+  previewFeatures = ["fullTextSearchPostgres", "relationJoins"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_ENGINE_URL")
+}
+
+model TempLeaves {
+  chainId                Int
+  campaignId             String
+  recipient              String @db.Char(42)
+  reason                 String
+  rewardToken            String @db.Char(42)
+  amount                 String @default("0")
+  lastProcessedTimestamp Int
+
+  @@id([chainId, campaignId, recipient, reason])
+  @@index([chainId])
+  @@index([campaignId])
+  @@index([recipient])
+  @@index([reason])
+  @@index([rewardToken])
+}
+
+model Leaves {
+  chainId                Int
+  root                   String
+  campaignId             String
+  recipient              String @db.Char(42)
+  reason                 String
+  rewardToken            String @db.Char(42)
+  amount                 String @default("0")
+  lastProcessedTimestamp Int
+
+  @@id([chainId, campaignId, recipient, reason, root])
+  @@index([campaignId])
+  @@index([recipient])
+  @@index([reason])
+  @@index([rewardToken])
+}
+
+model Proofs {
+  chainId     Int
+  root        String
+  recipient   String   @db.Char(42)
+  rewardToken String   @db.Char(42)
+  proof       String[]
+
+  @@id([chainId, root, recipient, rewardToken])
+  @@index([chainId])
+  @@index([recipient])
+  @@index([rewardToken])
+  @@index([root])
+}
+
+model MerklRoots {
+  chainId   Int
+  epoch     Int
+  timestamp Int
+  root      String
+
+  @@id([chainId, root])
+  @@index([chainId])
+  @@index([epoch])
+  @@index([root])
+}
+
+model Campaigns {
+  chainId         Int // Chain of the campaign
+  computeChainId  Int    @default(0) // Chain where the compute is done. 0 means it's the same as chainId
+  index           Int // Index of the campaign
+  campaignId      String // hash ID of the distrib
+  creator         String @db.Char(42) // Address of the creator
+  campaignType    Int // Type of campaign --> univ3, token, univ4
+  campaignSubType Int // Subtype of campaign --> UniswapV3, PancakeSwapV3
+  rewardToken     String // Address of reward token
+  amount          String
+  startTimestamp  Int
+  endTimestamp    Int
+
+  // Will be useful for table joins
+  mainParameter String @db.Char(42) // TODO: confirm it'll always be an address
+
+  // Config of the distrib
+  // A JSON with all the configuration specific to the distribution type
+  campaignParameters Json
+
+  @@id([chainId, campaignId])
+  @@index([chainId])
+  @@index([rewardToken])
+  @@index([startTimestamp])
+  @@index([endTimestamp])
+  @@index([campaignType])
+  @@index([mainParameter])
+}
+
+model CampaignsToProcess {
+  chainId         Int // Chain of the campaign
+  computeChainId  Int    @default(0) // Chain where the compute is done. 0 means it's the same as chainId
+  index           Int // Index of the campaign
+  campaignId      String // hash ID of the distrib
+  creator         String @db.Char(42) // Address of the creator
+  campaignType    Int // Type of campaign --> univ3, token, univ4
+  campaignSubType Int // Subtype of campaign --> UniswapV3, PancakeSwapV3
+  rewardToken     String // Address of reward token
+  amount          String
+  startTimestamp  Int
+  endTimestamp    Int
+
+  // Will be useful for table joins
+  mainParameter String @db.Char(42) // TODO: confirm it'll always be an address
+
+  // Config of the distrib
+  // A JSON with all the configuration specific to the distribution type
+  campaignParameters     Json
+  lastProcessedTimestamp Int
+  processUntilTimestamp  Int
+  jobIndex               Int
+
+  @@id([chainId, jobIndex])
+  @@index([chainId])
+  @@index([jobIndex])
+}
+
+model Claims {
+  chainId     Int
+  recipient   String @db.Char(42)
+  campaignId  String
+  rewardToken String @db.Char(42)
+  reason      String
+  root        String
+  claimed     String @default("0")
+  timestamp   Int
+
+  @@id([chainId, recipient, campaignId, rewardToken, reason])
+  @@index([chainId])
+  @@index([recipient])
+  @@index([campaignId])
+}
+
+model ClaimsOverTime {
+  chainId     Int
+  recipient   String @db.Char(42)
+  campaignId  String
+  rewardToken String @db.Char(42)
+  reason      String
+  root        String
+  claimed     String @default("0")
+  timestamp   Int
+
+  @@id([chainId, recipient, campaignId, rewardToken, reason, timestamp])
+  @@index([chainId])
+  @@index([recipient])
+  @@index([campaignId])
+  @@index([timestamp])
+}
+
+model ALMs {
+  chainId        Int
+  campaignId     String // hash ID of the distrib
+  name           String
+  type           String
+  address        String @db.Char(42)
+  target         String @db.Char(42)
+  owner          String @db.Char(42)
+  underlyingPool String @db.Char(42)
+
+  @@id([chainId, campaignId, address])
+}
+
+model ERC20Holders {
+  chainId     Int
+  token       String   @db.Char(42)
+  holders     String[] @db.Char(42)
+  blockNumber Int
+
+  @@id([chainId, token])
+}
+
+model Tokens {
+  chainId  Int
+  address  String @db.Char(42)
+  symbol   String
+  decimals Int
+
+  @@id([chainId, address])
+}
+
+model StateSave {
+  id          String
+  blockNumber Int
+  state       Json
+
+  @@id([id, blockNumber])
+}
+
+model Nodes {
+  id                  String @id
+  chainId             Int
+  nodeType            String
+  recipient           String
+  nodesSourceId       String
+  creationBlockNumber Int
+  metadata            Json?
+
+  // Solution for redundancy 
+  // Many-to-one relationship
+  NodesSources NodesSources @relation(fields: [nodesSourceId], references: [id], onDelete: Cascade)
+
+  // Deleted nodeType because want to have only one nodeType per recipient
+  @@unique([chainId, recipient])
+  // Indexes for faster queries
+  @@index([chainId])
+  @@index([nodeType])
+  @@index([recipient])
+}
+
+model NodesSources {
+  id                     String   @id
+  lastFetchedBlockNumber Int
+  nodeType               String
+  chainId                Int
+  source                 String   @db.Char(42)
+  topics                 String[]
+
+  // We could add a count of nodes to know if we deleted some
+  // One-to-many relationship back to Nodes
+  nodes Nodes[]
+
+  // Unique constraint to ensure no duplicate blocks for the same nodeType
+  @@unique([chainId, source, topics])
+  // Indexes for faster queries
+  @@index([nodeType])
+  @@index([chainId])
+  @@index([source])
+}
+
+model CampaignCreators {
+  address String @db.Char(42)
+  tags    String @default("")
+
+  @@id([address])
+}

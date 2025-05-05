@@ -1,0 +1,62 @@
+import type { SinglePayloadInputDto } from "@/modules/v4/programPayload/programPayload.model";
+export declare const DynamicDataSourceIdentifier: import("@sinclair/typebox").TObject<{
+    chainId: import("@sinclair/typebox").TNumber;
+    tokenAddress: import("@sinclair/typebox").TString;
+    rewardTokenAddress: import("@sinclair/typebox").TString;
+    symbolRewardToken: import("@sinclair/typebox").TString;
+    decimals: import("@sinclair/typebox").TOptional<import("@sinclair/typebox").TNumber>;
+}>;
+export declare const DynamicDataExtendedDto: import("@sinclair/typebox").TObject<{
+    targetTokenSymbol: import("@sinclair/typebox").TOptional<import("@sinclair/typebox").TString>;
+}>;
+export declare const SimplifiedCampaignDto: import("@sinclair/typebox").TObject<{
+    id: import("@sinclair/typebox").TOptional<import("@sinclair/typebox").TString>;
+    distributionChainId: import("@sinclair/typebox").TOptional<import("@sinclair/typebox").TNumber>;
+    rewardTokenId: import("@sinclair/typebox").TOptional<import("@sinclair/typebox").TString>;
+    opportunityId: import("@sinclair/typebox").TOptional<import("@sinclair/typebox").TString>;
+    computeChainId: import("@sinclair/typebox").TNumber;
+    chainId: import("@sinclair/typebox").TOptional<import("@sinclair/typebox").TNumber>;
+    campaignId: import("@sinclair/typebox").TOptional<import("@sinclair/typebox").TString>;
+    identifier: import("@sinclair/typebox").TOptional<import("@sinclair/typebox").TString>;
+    creatorAddress: import("@sinclair/typebox").TOptional<import("@sinclair/typebox").TString>;
+    type: import("@sinclair/typebox").TString;
+    subType: import("@sinclair/typebox").TOptional<import("@sinclair/typebox").TNumber>;
+    rewardTokenAddress: import("@sinclair/typebox").TOptional<import("@sinclair/typebox").TString>;
+    amount: import("@sinclair/typebox").TOptional<import("@sinclair/typebox").TString>;
+    opportunityIdentifier: import("@sinclair/typebox").TOptional<import("@sinclair/typebox").TString>;
+    startTimestamp: import("@sinclair/typebox").TOptional<import("@sinclair/typebox").TString>;
+    endTimestamp: import("@sinclair/typebox").TOptional<import("@sinclair/typebox").TString>;
+    params: import("@sinclair/typebox").TObject<{}>;
+    tags: import("@sinclair/typebox").TOptional<import("@sinclair/typebox").TArray<import("@sinclair/typebox").TString>>;
+    chain: import("@sinclair/typebox").TOptional<import("@sinclair/typebox").TObject<{}>>;
+    rewardToken: import("@sinclair/typebox").TOptional<import("@sinclair/typebox").TObject<{}>>;
+    distributionChain: import("@sinclair/typebox").TOptional<import("@sinclair/typebox").TObject<{}>>;
+    campaignStatus: import("@sinclair/typebox").TOptional<import("@sinclair/typebox").TObject<{}>>;
+}>;
+export declare const FilledCampaignDto: import("@sinclair/typebox").TObject<{
+    id: import("@sinclair/typebox").TString;
+    distributionChainId: import("@sinclair/typebox").TNumber;
+    rewardTokenId: import("@sinclair/typebox").TString;
+    opportunityId: import("@sinclair/typebox").TString;
+    computeChainId: import("@sinclair/typebox").TNumber;
+    chainId: import("@sinclair/typebox").TNumber;
+    campaignId: import("@sinclair/typebox").TString;
+    identifier: import("@sinclair/typebox").TString;
+    creatorAddress: import("@sinclair/typebox").TString;
+    type: import("@sinclair/typebox").TString;
+    subType: import("@sinclair/typebox").TOptional<import("@sinclair/typebox").TNumber>;
+    rewardTokenAddress: import("@sinclair/typebox").TString;
+    amount: import("@sinclair/typebox").TString;
+    opportunityIdentifier: import("@sinclair/typebox").TString;
+    startTimestamp: import("@sinclair/typebox").TString;
+    endTimestamp: import("@sinclair/typebox").TString;
+    campaignParameters: import("@sinclair/typebox").TObject<{}>;
+    mainParameter: import("@sinclair/typebox").TString;
+}>;
+export type DynamicDataSourceModel = typeof DynamicDataSourceIdentifier.static;
+export type SimplifiedCampaignDtoModel = typeof SimplifiedCampaignDto.static;
+export type FilledCampaignDtoModel = typeof FilledCampaignDto.static;
+export type DynamicDataExtendedDtoModel = typeof DynamicDataExtendedDto.static;
+export type SinglePayloadInputDtoModelExtended = typeof SinglePayloadInputDto.static & {
+    targetTokenSymbol: string;
+};

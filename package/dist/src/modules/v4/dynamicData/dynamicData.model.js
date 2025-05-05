@@ -1,0 +1,56 @@
+import { t } from "elysia";
+// ─── DTOs ────────────────────────────────────────────────────────────────────
+export const DynamicDataSourceIdentifier = t.Object({
+    chainId: t.Numeric(),
+    tokenAddress: t.String(),
+    rewardTokenAddress: t.String(),
+    symbolRewardToken: t.String(),
+    decimals: t.Optional(t.Numeric()),
+});
+export const DynamicDataExtendedDto = t.Object({
+    targetTokenSymbol: t.Optional(t.String()),
+});
+export const SimplifiedCampaignDto = t.Object({
+    id: t.Optional(t.String()),
+    distributionChainId: t.Optional(t.Number()),
+    rewardTokenId: t.Optional(t.String()),
+    opportunityId: t.Optional(t.String()),
+    computeChainId: t.Number(),
+    chainId: t.Optional(t.Number()),
+    campaignId: t.Optional(t.String()),
+    identifier: t.Optional(t.String()),
+    creatorAddress: t.Optional(t.String()),
+    type: t.String(),
+    subType: t.Optional(t.Number()),
+    rewardTokenAddress: t.Optional(t.String()),
+    amount: t.Optional(t.String()),
+    opportunityIdentifier: t.Optional(t.String()),
+    startTimestamp: t.Optional(t.String()),
+    endTimestamp: t.Optional(t.String()),
+    params: t.Object({}),
+    tags: t.Optional(t.Array(t.String())),
+    chain: t.Optional(t.Object({})),
+    rewardToken: t.Optional(t.Object({})),
+    distributionChain: t.Optional(t.Object({})),
+    campaignStatus: t.Optional(t.Object({})),
+});
+export const FilledCampaignDto = t.Object({
+    id: t.String(),
+    distributionChainId: t.Number(),
+    rewardTokenId: t.String(),
+    opportunityId: t.String(),
+    computeChainId: t.Number(),
+    chainId: t.Number(),
+    campaignId: t.String(),
+    identifier: t.String(),
+    creatorAddress: t.String(),
+    type: t.String(),
+    subType: t.Optional(t.Number()),
+    rewardTokenAddress: t.String(),
+    amount: t.String(),
+    opportunityIdentifier: t.String(),
+    startTimestamp: t.String(),
+    endTimestamp: t.String(),
+    campaignParameters: t.Object({}),
+    mainParameter: t.String(),
+});
